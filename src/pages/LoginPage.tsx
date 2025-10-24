@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import { Faucet } from 'lucide-react';
+import { Waypoints } from 'lucide-react';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -31,7 +31,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="flex flex-col items-center mb-8">
           <div className="bg-blue-600 p-4 rounded-full mb-4">
-            <Faucet className="w-12 h-12 text-white" />
+            <Waypoints className="w-12 h-12 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-800">Water Network</h1>
           <p className="text-gray-600 mt-2">Management System</p>

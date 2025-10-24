@@ -1,6 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Droplets, Bell } from 'lucide-react';
+import { LogOut, Waypoints, Bell } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 export default function Navbar() {
@@ -19,7 +19,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="bg-blue-600 p-2 rounded-lg">
-              <Droplets className="w-6 h-6 text-white" />
+              <Waypoints className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">Water Network System</h1>
