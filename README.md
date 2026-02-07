@@ -43,41 +43,6 @@ EPANET .inp Parser / Network Builder
 
 ---
 
-## 📁 Project Structure
-
-.
-├── backend/
-│ ├── main.py # FastAPI entry point
-│ ├── parser.py # EPANET .inp parser
-│ └── requirements.txt
-│
-├── src/
-│ ├── components/ # Reusable UI components
-│ │ ├── Navbar.tsx
-│ │ ├── Sidebar.tsx
-│ │ └── StatCard.tsx
-│ │
-│ ├── pages/
-│ │ └── User/
-│ │ ├── Dashboard.tsx
-│ │ ├── DemandManager.tsx
-│ │ ├── Visualizer.tsx
-│ │ └── ExportData.tsx
-│ │
-│ ├── store/
-│ │ └── networkStore.ts # Zustand global store
-│ │
-│ ├── App.tsx
-│ ├── main.tsx
-│ └── index.css
-│
-├── package.json
-├── vite.config.ts
-└── README.md
-
-
----
-
 ## 🧰 Prerequisites
 
 Make sure the following are installed on your system:
@@ -93,69 +58,80 @@ Check versions:
 node -v
 python3 --version
 git --version
+```
 
 🖥️ Running the Project Locally
+
 1️⃣ Clone the Repository
+```bash
 git clone https://github.com/<your-username>/<repo-name>.git
 cd <repo-name>
+```
 
 ⚛️ Frontend Setup (React + Vite)
 2️⃣ Install Dependencies
+```bash
 npm install
-
-
-or (if you use pnpm):
-
-pnpm install
+```
 
 3️⃣ Start Frontend Development Server
+```bash
 npm run dev
-
+```
 
 The frontend will be available at:
-
+```bash
 http://localhost:5173
+```
 
 🧪 Backend Setup (FastAPI)
 4️⃣ Navigate to Backend Directory
+```bash
 cd backend
+```
 
 5️⃣ Create and Activate Virtual Environment (Recommended)
+```bash
 python3 -m venv venv
 source venv/bin/activate
-
+```
 
 On Windows (PowerShell):
-
+```bash
 venv\Scripts\Activate.ps1
+```
 
 6️⃣ Install Backend Dependencies
+```bash
 pip install -r requirements.txt
+```
 
 7️⃣ Start the Backend Server
+```bash
 uvicorn main:app --reload
-
+```
 
 Backend will run at:
-
+```bash
 http://127.0.0.1:8000
-
+```
 
 Swagger API documentation:
-
+```bash
 http://127.0.0.1:8000/docs
+```
 
 🔗 Frontend ↔ Backend Connection
 
 The frontend sends requests to:
-
+```bash
 http://127.0.0.1:8000
-
+```
 
 Example endpoint:
-
+```bash
 POST /networks/upload
-
+```
 
 Make sure the backend is running before uploading files.
 
@@ -239,8 +215,3 @@ Pipes
 
 🟢 Animated: Pump
 
-📦 Export Formats
-Data Type	JSON	CSV
-Networks	✅	✅
-Nodes	✅	✅
-Alerts	✅	✅
