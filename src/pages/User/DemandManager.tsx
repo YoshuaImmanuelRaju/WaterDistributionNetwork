@@ -3,13 +3,6 @@ import { toast } from 'react-toastify';
 import { Database, CreditCard as Edit2, Save, Upload } from 'lucide-react';
 import networksData from '../../mockData/networks.json';
 
-type Cluster = {
-  id: string;
-  name: string;
-  nodes: string[];
-  demand: number;
-};
-
 export default function DemandManager() {
   const [clusters, setClusters] = useState(networksData.clusters);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,20 +24,10 @@ export default function DemandManager() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const res = await fetch("http://localhost:5000/api/upload-inp", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-    toast.success("Network processed successfullt");
-
-    console.log(data);
+    if (file) {
+      setUploadedFile(file);
+      toast.success(`File "${file.name}" uploaded successfully`);
+    }
   };
 
   return (
