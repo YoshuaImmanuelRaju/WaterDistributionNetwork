@@ -1,116 +1,290 @@
-import { AlertTriangle, Network, Database, TrendingUp } from 'lucide-react';
+import {
+  AlertTriangle,
+  Network,
+  Gauge,
+  Layers,
+} from 'lucide-react';
+import { useNetworkStore } from '../../store/networkStore';
 import StatCard from '../../components/StatCard';
-import alertsData from '../../mockData/alerts.json';
-import networksData from '../../mockData/networks.json';
+import { useNavigate } from 'react-router-dom';
 
-export default function UserDashboard() {
-  const activeAlerts = alertsData.alerts.filter(a => !a.acknowledged);
+/* ---------------- ALERT INTERPRETATION ---------------- */
+
+function explainAlert(alert: any) {
+  switch (alert.type) {
+    case 'LOW_PRESSURE':
+      return {
+        title: 'Low Pressure',
+        description:
+          'Pressure at this node has dropped below safe operating limits.',
+        severity: 'critical',
+      };
+
+    case 'HIGH_DEMAND':
+      return {
+        title: 'High Demand',
+        description:
+          'Demand exceeds expected values. Risk of supply shortfall.',
+        severity: 'warning',
+      };
+
+    case 'PIPE_LOSS':
+      return {
+        title: 'High Headloss',
+        description:
+          'Pipe is experiencing excessive headloss. Possible bottleneck.',
+        severity: 'warning',
+      };
+
+    case 'QUALITY':
+      return {
+        title: 'Water Quality Issue',
+        description:
+          'Quality parameter out of acceptable range.',
+        severity: 'critical',
+      };
+
+    default:
+      return {
+        title: 'Unknown Issue',
+        description:
+          alert.message ??
+          'An unspecified issue was detected.',
+        severity: 'warning',
+      };
+  }
+}
+
+function severityColor(severity: string) {
+  if (severity === 'critical') return 'text-red-600';
+  return 'text-orange-600';
+}
+
+/* ---------------- COMPONENT ---------------- */
+
+export default function Dashboard() {
+  const { networks, setActiveNetwork } =
+    useNetworkStore();
+  const navigate = useNavigate();
+
+  /* ---------------- AGGREGATES ---------------- */
+
+  const totalNetworks = networks.length;
+  const totalNodes = networks.reduce(
+    (sum, n) => sum + n.nodes.length,
+    0
+  );
+  const totalEdges = networks.reduce(
+    (sum, n) => sum + n.edges.length,
+    0
+  );
+  const totalAlerts = networks.reduce(
+    (sum, n) => sum + (n.alerts?.length ?? 0),
+    0
+  );
+
+  const totalDemand = networks.reduce(
+    (sum, n) =>
+      sum +
+      n.nodes.reduce(
+        (s, node) => s + (node.demand ?? 0),
+        0
+      ),
+    0
+  );
+
+  const getNetworkStatus = (alerts: number) =>
+    alerts > 0 ? '⚠️ Attention' : '✅ Healthy';
+
+  /* ---------------- RENDER ---------------- */
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-800">User Dashboard</h1>
-        <p className="text-gray-600 mt-1">Monitor your water distribution network</p>
+    <div className="p-6 space-y-8">
+      <h1 className="text-3xl font-bold">
+        System Dashboard
+      </h1>
+
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <StatCard
+          icon={<Layers />}
+          label="Networks"
+          value={totalNetworks}
+        />
+        <StatCard
+          icon={<Network />}
+          label="Nodes"
+          value={totalNodes}
+        />
+        <StatCard
+          icon={<Network />}
+          label="Pipes"
+          value={totalEdges}
+        />
+        <StatCard
+          icon={<Gauge />}
+          label="Total Demand"
+          value={Math.round(totalDemand)}
+        />
+        <StatCard
+          icon={<AlertTriangle />}
+          label="Alerts"
+          value={totalAlerts}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Active Networks"
-          value={networksData.networks.length}
-          icon={Network}
-          color="blue"
-        />
-        <StatCard
-          title="Active Alerts"
-          value={activeAlerts.length}
-          icon={AlertTriangle}
-          color="red"
-          change="2 new today"
-        />
-        <StatCard
-          title="Total Clusters"
-          value={networksData.clusters.length}
-          icon={Database}
-          color="green"
-        />
-        <StatCard
-          title="Avg Demand"
-          value="405 L/s"
-          icon={TrendingUp}
-          color="orange"
-        />
-      </div>
+      {/* NETWORK HEALTH TABLE */}
+      <div className="bg-white border rounded-xl p-6">
+        <h2 className="text-xl font-semibold mb-4">
+          Network Health
+        </h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Networks</h2>
-          <div className="space-y-3">
-            {networksData.networks.map((network) => (
-              <div key={network.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-blue-100 p-2 rounded-lg">
-                    <Network className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-800">{network.name}</p>
-                    <p className="text-sm text-gray-500">Uploaded: {network.uploadDate}</p>
-                  </div>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                  Active
-                </span>
-              </div>
-            ))}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-2">Network</th>
+                <th>Nodes</th>
+                <th>Pipes</th>
+                <th>Demand</th>
+                <th>Alerts</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {networks.map((n) => {
+                const demand = n.nodes.reduce(
+                  (s, node) =>
+                    s + (node.demand ?? 0),
+                  0
+                );
+                const alerts = n.alerts?.length ?? 0;
+
+                return (
+                  <tr
+                    key={n.id}
+                    className="border-b hover:bg-gray-50"
+                  >
+                    <td className="py-2 font-medium">
+                      {n.name}
+                    </td>
+                    <td>{n.nodes.length}</td>
+                    <td>{n.edges.length}</td>
+                    <td>{Math.round(demand)}</td>
+                    <td
+                      className={
+                        alerts > 0
+                          ? 'text-red-600 font-semibold'
+                          : 'text-green-600'
+                      }
+                    >
+                      {alerts}
+                    </td>
+                    <td>{getNetworkStatus(alerts)}</td>
+                    <td>
+                      <button
+                        onClick={() => {
+                          setActiveNetwork(n.id);
+                          navigate('/user/visualizer');
+                        }}
+                        className="text-blue-600 hover:underline"
+                      >
+                        Open
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+      </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center justify-between">
-            <span>Leak Alerts</span>
-            {activeAlerts.length > 0 && (
-              <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
-                {activeAlerts.length} Active
-              </span>
-            )}
-          </h2>
-          <div className="space-y-3">
-            {alertsData.alerts.slice(0, 5).map((alert) => (
-              <div
-                key={alert.id}
-                className={`p-4 rounded-lg border-l-4 ${
-                  alert.severity === 'high'
-                    ? 'bg-red-50 border-red-500'
-                    : alert.severity === 'medium'
-                    ? 'bg-orange-50 border-orange-500'
-                    : 'bg-yellow-50 border-yellow-500'
-                } ${alert.acknowledged ? 'opacity-60' : ''}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <AlertTriangle className={`w-4 h-4 ${
-                        alert.severity === 'high'
-                          ? 'text-red-600'
-                          : alert.severity === 'medium'
-                          ? 'text-orange-600'
-                          : 'text-yellow-600'
-                      }`} />
-                      <span className="font-medium text-gray-800">{alert.location}</span>
+      {/* ACTIVE ALERTS WITH MEANING */}
+      <div className="bg-white border rounded-xl p-6">
+        <h2 className="text-xl font-semibold mb-4">
+          Active Alerts (Detailed)
+        </h2>
+
+        {totalAlerts === 0 ? (
+          <p className="text-green-600">
+            No active alerts 🎉
+          </p>
+        ) : (
+          <ul className="space-y-4">
+            {networks.flatMap((n) =>
+              (n.alerts ?? []).map((a, idx) => {
+                const info = explainAlert(a);
+                return (
+                  <li
+                    key={`${n.id}-${idx}`}
+                    className="border rounded-lg p-4"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle
+                        className={`w-5 h-5 ${severityColor(
+                          info.severity
+                        )}`}
+                      />
+                      <span
+                        className={`font-semibold ${severityColor(
+                          info.severity
+                        )}`}
+                      >
+                        {info.title}
+                      </span>
                     </div>
-                    <p className="text-sm text-gray-600">{alert.message}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(alert.timestamp).toLocaleString()}
-                    </p>
-                  </div>
-                  {alert.acknowledged && (
-                    <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded">
-                      Ack
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+
+                    <div className="text-sm text-gray-700 mt-1">
+                      {info.description}
+                    </div>
+
+                    <div className="text-sm mt-2">
+                      <span className="font-medium">
+                        Network:
+                      </span>{' '}
+                      {n.name}
+                    </div>
+
+                    <div className="text-sm">
+                      <span className="font-medium">
+                        Location:
+                      </span>{' '}
+                      {a.location ?? 'Unknown'}
+                    </div>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        )}
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="bg-white border rounded-xl p-6">
+        <h2 className="text-xl font-semibold mb-4">
+          Quick Actions
+        </h2>
+
+        <div className="flex gap-4">
+          <button
+            onClick={() =>
+              navigate('/user/demand-manager')
+            }
+            className="px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Edit Demands
+          </button>
+
+          <button
+            onClick={() =>
+              navigate('/user/visualizer')
+            }
+            className="px-4 py-2 border rounded"
+          >
+            Open Visualizer
+          </button>
         </div>
       </div>
     </div>

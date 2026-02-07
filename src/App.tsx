@@ -73,7 +73,7 @@ function App() {
             }
           />
 
-          <Route
+          {/* <Route
             path="/admin/*"
             element={
               <ProtectedRoute allowedRole="admin">
@@ -91,7 +91,7 @@ function App() {
             }
           />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} /> */}
         </Routes>
       </BrowserRouter>
 

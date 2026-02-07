@@ -1,147 +1,319 @@
-import { useState } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, Node, Edge } from 'reactflow';
+import ReactFlow, {
+  Background,
+  Controls,
+  Node,
+  Edge,
+  ReactFlowInstance,
+} from 'reactflow';
 import 'reactflow/dist/style.css';
-import networksData from '../../mockData/networks.json';
-import alertsData from '../../mockData/alerts.json';
-import { Network, AlertTriangle } from 'lucide-react';
 
-export default function Visualizer() {
-  const [selectedNetwork, setSelectedNetwork] = useState(networksData.networks[0]);
+import { AlertTriangle, Network } from 'lucide-react';
+import { useNetworkStore } from '../../store/networkStore';
+import StatCard from '../../components/StatCard';
+import { useEffect, useMemo, useState } from 'react';
 
-  const networkAlerts = alertsData.alerts.filter(
-    a => a.networkId === selectedNetwork.id && !a.acknowledged
+/* ---------------- HELPERS ---------------- */
+
+const clamp = (v: number, min: number, max: number) =>
+  Math.min(Math.max(v, min), max);
+
+const pipeColor = (d?: number) => {
+  if (!d) return '#6b7280';
+  if (d <= 8) return '#dc2626';    // small
+  if (d <= 14) return '#f97316';   // medium
+  return '#2563eb';                // large
+};
+
+function normalizeNodes(nodes: any[]) {
+  const PAD = 120;
+
+  const xs = nodes.map((n) => n.x);
+  const ys = nodes.map((n) => n.y);
+
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+
+  const scale = Math.min(
+    1200 / (maxX - minX || 1),
+    800 / (maxY - minY || 1)
   );
 
-  const nodes: Node[] = selectedNetwork.nodes.map((node) => {
-    const hasAlert = networkAlerts.some(alert =>
-      alert.location.includes(node.id)
+  return nodes.map((n) => ({
+    ...n,
+    x: (n.x - minX) * scale + PAD,
+    y: (n.y - minY) * scale + PAD,
+  }));
+}
+
+/* ---------------- COMPONENT ---------------- */
+
+export default function Visualizer() {
+  const {
+    networks,
+    activeNetworkId,
+    setActiveNetwork,
+    getActiveNetwork,
+  } = useNetworkStore();
+
+  const activeNetwork = getActiveNetwork();
+
+  const [zoom, setZoom] = useState(1);
+  const [rf, setRf] =
+    useState<ReactFlowInstance | null>(null);
+  const [hovered, setHovered] = useState<any | null>(null);
+
+  if (!activeNetwork) {
+    return <div className="p-6">No network selected</div>;
+  }
+
+  const nodeCount = activeNetwork.nodes.length;
+  const alerts = activeNetwork.alerts ?? [];
+
+  /* 🔥 VERY SMALL BASE SIZE */
+  const baseNodeSize = clamp(
+    420 / nodeCount,
+    4,
+    10
+  );
+
+  const normalized = useMemo(
+    () => normalizeNodes(activeNetwork.nodes),
+    [activeNetwork.nodes]
+  );
+
+  /* ---------------- NODES ---------------- */
+
+  const nodes: Node[] = normalized.map((n) => {
+    const hasAlert = alerts.some((a) =>
+      a.location.includes(n.id)
     );
 
+    const typeBoost =
+      n.type === 'tank' ? 1.6 :
+      n.type === 'reservoir' ? 1.9 :
+      1;
+
+    const size =
+      baseNodeSize *
+      typeBoost *
+      clamp(zoom, 0.7, 1.8);
+
     return {
-      id: node.id,
-      position: { x: node.x, y: node.y },
+      id: n.id,
+      position: { x: n.x, y: n.y },
       data: {
-        label: (
-          <div className="text-center">
-            <div className={`font-bold ${hasAlert ? 'text-red-600' : 'text-gray-800'}`}>
-              {node.id}
+        ...n,
+        label:
+          zoom > 1.3 ? (
+            <div className="text-[8px] font-semibold text-center">
+              <div>{n.id}</div>
+              {n.type === 'junction' && (
+                <div className="text-[7px] text-gray-500">
+                  {n.demand}
+                </div>
+              )}
             </div>
-            {node.type === 'junction' && (
-              <div className="text-xs text-gray-600">{node.demand} L/s</div>
-            )}
-            {hasAlert && (
-              <AlertTriangle className="w-4 h-4 text-red-600 mx-auto mt-1" />
-            )}
-          </div>
-        )
+          ) : null,
       },
       style: {
-        background: hasAlert ? '#fee2e2' : node.type === 'reservoir' ? '#dbeafe' : '#fff',
-        border: hasAlert ? '2px solid #dc2626' : '2px solid #3b82f6',
-        borderRadius: '8px',
-        padding: '10px',
-        width: 100
-      }
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background:
+          n.type === 'reservoir'
+            ? '#dbeafe'
+            : n.type === 'tank'
+            ? '#dcfce7'
+            : '#ffffff',
+        border: hasAlert
+          ? '1.5px solid #dc2626'
+          : '1px solid #3b82f6',
+        boxShadow: hasAlert
+          ? '0 0 0 4px rgba(220,38,38,0.35)'
+          : undefined,
+        animation: hasAlert
+          ? 'pulse 1.5s infinite'
+          : undefined,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
     };
   });
 
-  const edges: Edge[] = selectedNetwork.edges.map((edge) => {
-    const hasAlert = networkAlerts.some(alert =>
-      alert.location.includes(edge.id)
-    );
+  /* ---------------- EDGES ---------------- */
 
-    return {
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      label: `${edge.diameter}"`,
+  const edges: Edge[] = activeNetwork.edges.map(
+    (e: any) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
       type: 'smoothstep',
-      animated: hasAlert,
+      animated: e.type === 'pump',
       style: {
-        stroke: hasAlert ? '#dc2626' : '#3b82f6',
-        strokeWidth: hasAlert ? 3 : 2
-      }
-    };
-  });
+        stroke: pipeColor(e.diameter),
+        strokeWidth: clamp(
+          1.6 * zoom,
+          0.6,
+          3
+        ),
+        strokeDasharray:
+          e.type === 'valve' ? '6 4' : undefined,
+      },
+    })
+  );
+
+  useEffect(() => {
+    rf?.fitView({ padding: 0.4 });
+  }, [rf, activeNetworkId]);
+
+  /* ---------------- RENDER ---------------- */
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-800">Network Visualizer</h1>
-        <p className="text-gray-600 mt-1">Interactive water distribution network graph</p>
-      </div>
+    <div className="p-6 space-y-6 relative">
+      <h1 className="text-3xl font-bold">
+        Network Visualizer
+      </h1>
 
-      <div className="flex items-center space-x-4">
-        <label className="text-sm font-medium text-gray-700">Select Network:</label>
-        <select
-          value={selectedNetwork.id}
-          onChange={(e) => {
-            const network = networksData.networks.find(n => n.id === e.target.value);
-            if (network) setSelectedNetwork(network);
-          }}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-        >
-          {networksData.networks.map((network) => (
-            <option key={network.id} value={network.id}>
-              {network.name}
-            </option>
-          ))}
-        </select>
+      {/* Network selector */}
+      <select
+        value={activeNetworkId ?? ''}
+        onChange={(e) =>
+          setActiveNetwork(e.target.value)
+        }
+        className="border px-3 py-2 rounded"
+      >
+        {networks.map((n) => (
+          <option key={n.id} value={n.id}>
+            {n.name}
+          </option>
+        ))}
+      </select>
 
-        {networkAlerts.length > 0 && (
-          <div className="flex items-center space-x-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <span className="text-sm font-medium text-red-700">
-              {networkAlerts.length} Active Alert{networkAlerts.length > 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" style={{ height: '600px' }}>
+      {/* Graph */}
+      <div className="h-[600px] border rounded-lg relative">
         <ReactFlow
           nodes={nodes}
           edges={edges}
           fitView
-          className="bg-gray-50"
+          onInit={setRf}
+          onMove={(_, v) => setZoom(v.zoom)}
+          onNodeMouseEnter={(_, n) =>
+            setHovered(n.data)
+          }
+          onNodeMouseLeave={() =>
+            setHovered(null)
+          }
         >
           <Background />
           <Controls />
-          <MiniMap />
         </ReactFlow>
+
+        {/* Hover tooltip */}
+        {hovered && (
+          <div className="absolute bottom-4 left-4 bg-gray-900 text-white text-xs px-3 py-2 rounded shadow-lg">
+            <div className="font-semibold">
+              Node {hovered.id}
+            </div>
+            <div>Type: {hovered.type}</div>
+            {hovered.demand !== undefined && (
+              <div>Demand: {hovered.demand}</div>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center space-x-3">
-            <Network className="w-5 h-5 text-blue-600" />
-            <div>
-              <p className="text-sm text-gray-600">Total Nodes</p>
-              <p className="text-2xl font-bold text-gray-800">{selectedNetwork.nodes.length}</p>
+      {/* 🔍 LEGEND */}
+      <div className="bg-white border rounded-xl p-4">
+        <h2 className="font-semibold mb-3">
+          Network Legend
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          {/* Nodes */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded-full border border-blue-500 bg-white" />
+              <span>Junction (Demand Node)</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded-full bg-green-200 border border-green-500" />
+              <span>Tank (Storage)</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded-full bg-blue-200 border border-blue-500" />
+              <span>Reservoir (Source)</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded-full border-2 border-red-600" />
+              <span>Alert / Issue at Node</span>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center space-x-3">
-            <Network className="w-5 h-5 text-green-600" />
-            <div>
-              <p className="text-sm text-gray-600">Total Pipes</p>
-              <p className="text-2xl font-bold text-gray-800">{selectedNetwork.edges.length}</p>
+          {/* Pipes */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-[3px] bg-red-600" />
+              <span>Small Pipe (≤ 8)</span>
             </div>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <div>
-              <p className="text-sm text-gray-600">Active Alerts</p>
-              <p className="text-2xl font-bold text-gray-800">{networkAlerts.length}</p>
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-[3px] bg-orange-500" />
+              <span>Medium Pipe (≤ 14)</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-[3px] bg-blue-600" />
+              <span>Large Pipe (&gt; 14)</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-[3px] border-b-2 border-dashed border-purple-600" />
+              <span>Valve</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-[3px] bg-green-600 animate-pulse" />
+              <span>Pump</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard
+          icon={<Network />}
+          label="Nodes"
+          value={nodeCount}
+        />
+        <StatCard
+          icon={<Network />}
+          label="Edges"
+          value={activeNetwork.edges.length}
+        />
+        <StatCard
+          icon={<AlertTriangle />}
+          label="Alerts"
+          value={alerts.length}
+        />
+      </div>
+
+      {/* Alert pulse animation */}
+      <style>
+        {`
+          @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
+            100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+          }
+        `}
+      </style>
     </div>
   );
 }
