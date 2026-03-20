@@ -15,6 +15,7 @@ export type Network = {
   nodes: NodeType[];
   edges: any[];
   alerts?: any[];
+  pressures?: Record<string, Record<string, number>>;
 };
 
 type NetworkStore = {
@@ -28,6 +29,8 @@ type NetworkStore = {
     nodeId: string,
     demand: number
   ) => void;
+
+  deleteNetwork: (networkId: string) => void;   // 🔥 NEW
 
   getActiveNetwork: () => Network | null;
 };
@@ -62,6 +65,22 @@ export const useNetworkStore = create<NetworkStore>()(
                 }
           ),
         })),
+
+      // 🔥 DELETE NETWORK
+      deleteNetwork: (networkId) =>
+        set((state) => {
+          const filtered = state.networks.filter(
+            (n) => n.id !== networkId
+          );
+
+          return {
+            networks: filtered,
+            activeNetworkId:
+              state.activeNetworkId === networkId
+                ? filtered[0]?.id ?? null
+                : state.activeNetworkId,
+          };
+        }),
 
       getActiveNetwork: () => {
         const { networks, activeNetworkId } = get();

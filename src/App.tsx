@@ -9,11 +9,12 @@ import UserDashboard from './pages/User/Dashboard';
 import Visualizer from './pages/User/Visualizer';
 import DemandManager from './pages/User/DemandManager';
 import ExportData from './pages/User/ExportData';
-import AdminDashboard from './pages/Admin/Dashboard';
-import AlgorithmManager from './pages/Admin/AlgorithmManager';
-import EPANETSimulator from './pages/Admin/EPANETSimulator';
-import KeyManagement from './pages/Admin/KeyManagement';
-import ClusterAnalysis from './pages/Admin/ClusterAnalysis';
+// import AdminDashboard from './pages/Admin/Dashboard';
+// import AlgorithmManager from './pages/Admin/AlgorithmManager';
+// import EPANETSimulator from './pages/Admin/EPANETSimulator';
+// import KeyManagement from './pages/Admin/KeyManagement';
+// import ClusterAnalysis from './pages/Admin/ClusterAnalysis';
+
 
 function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; allowedRole?: 'user' | 'admin' }) {
   const { user } = useAuth();
@@ -37,7 +38,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-bgDark text-textPrimary">
       <Navbar />
       <div className="flex">
         <Sidebar />
