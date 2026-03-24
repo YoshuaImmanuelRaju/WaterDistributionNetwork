@@ -1,3 +1,440 @@
+// // import {
+// //   AlertTriangle,
+// //   Network,
+// //   Gauge,
+// //   Layers,
+// // } from 'lucide-react';
+// // import { useNetworkStore } from '../../store/networkStore';
+// // import StatCard from '../../components/StatCard';
+// // import { useNavigate } from 'react-router-dom';
+// // import { useMemo, useState, useEffect } from 'react';
+// // import {
+// //   LineChart,
+// //   Line,
+// //   XAxis,
+// //   YAxis,
+// //   Tooltip,
+// //   ResponsiveContainer,
+// //   PieChart,
+// //   Pie,
+// //   Cell,
+// // } from 'recharts';
+
+// // export default function Dashboard() {
+// //   const { networks, setActiveNetwork } = useNetworkStore();
+// //   const navigate = useNavigate();
+
+// //   const activeNetwork = networks[0];
+
+// //   /* ================= RESPONSIVE SCREEN ================= */
+// //   const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+// //   useEffect(() => {
+// //     const handleResize = () => {
+// //       setIsSmallScreen(window.innerWidth < 768);
+// //     };
+
+// //     handleResize();
+// //     window.addEventListener('resize', handleResize);
+// //     return () => window.removeEventListener('resize', handleResize);
+// //   }, []);
+
+// //   /* ================= SAFE PRESSURE ACCESS ================= */
+// //   const getPressure = (nodeId: string, hour = '0') =>
+// //     activeNetwork?.pressures?.[hour]?.[nodeId] ?? 0;
+
+// //   /* ================= STATS ================= */
+// //   const stats = useMemo(() => {
+// //     return {
+// //       totalNetworks: networks.length,
+// //       totalNodes: networks.reduce((s, n) => s + n.nodes.length, 0),
+// //       totalEdges: networks.reduce((s, n) => s + n.edges.length, 0),
+// //       totalAlerts: networks.reduce(
+// //         (s, n) => s + (n.alerts?.length ?? 0),
+// //         0
+// //       ),
+// //     };
+// //   }, [networks]);
+
+// //   /* ================= CHART DATA (24 HOURS FIXED) ================= */
+// //   const chartData = useMemo(() => {
+// //     return Array.from({ length: 24 }, (_, h) => {
+// //       const values = Object.values(
+// //         activeNetwork?.pressures?.[String(h)] ?? {}
+// //       ) as number[];
+
+// //       const avg =
+// //         values.reduce((a, b) => a + b, 0) /
+// //         (values.length || 1);
+
+// //       return {
+// //         hour: h,
+// //         simulated: avg,
+// //         measured: avg - 2,
+// //       };
+// //     });
+// //   }, [activeNetwork]);
+
+// //   const avgPressure =
+// //     chartData.reduce((s, d) => s + d.simulated, 0) /
+// //       (chartData.length || 1) || 0;
+
+// //   /* ================= SYSTEM HEALTH ================= */
+// //   const healthData = useMemo(() => {
+// //     if (!activeNetwork) return [];
+
+// //     let healthy = 0,
+// //       warning = 0,
+// //       critical = 0;
+
+// //     activeNetwork.nodes.forEach((n) => {
+// //       const p = getPressure(n.id);
+
+// //       if (p < 20) critical++;
+// //       else if (p < 30) warning++;
+// //       else healthy++;
+// //     });
+
+// //     return [
+// //       { name: 'Healthy', value: healthy, color: '#22c55e' },
+// //       { name: 'Warning', value: warning, color: '#facc15' },
+// //       { name: 'Critical', value: critical, color: '#ef4444' },
+// //     ];
+// //   }, [activeNetwork]);
+
+// //   return (
+// //     <div className="p-6 space-y-8 bg-slate-950 min-h-screen text-slate-300">
+      
+// //       {/* ================= HEADER ================= */}
+// //       <div className="flex justify-between items-center">
+// //         <div>
+// //           <h1 className="text-3xl font-bold text-slate-200">
+// //             Dashboard
+// //           </h1>
+// //           <p className="text-slate-500">
+// //             Demo Water Network — Real-time monitoring overview
+// //           </p>
+// //         </div>
+
+// //         <div className="text-sm text-slate-400">
+// //           Last sync: {new Date().toLocaleTimeString()}
+// //         </div>
+// //       </div>
+
+// //       {/* ================= STATS ================= */}
+// //       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+// //         <StatCard icon={<Layers />} label="Networks" value={stats.totalNetworks} />
+// //         <StatCard icon={<Network />} label="Nodes" value={stats.totalNodes} />
+// //         <StatCard icon={<Network />} label="Pipes" value={stats.totalEdges} />
+// //         <StatCard icon={<Gauge />} label="Avg Pressure" value={`${avgPressure.toFixed(1)} m`} />
+// //         <StatCard icon={<AlertTriangle />} label="Alerts" value={stats.totalAlerts} />
+// //       </div>
+
+// //       {/* ================= CHARTS ================= */}
+// //       {activeNetwork && (
+// //         <div className="grid md:grid-cols-3 gap-6">
+          
+// //           {/* PRESSURE LINE CHART */}
+// //           <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
+// //             <h2 className="text-lg mb-4 text-slate-400">
+// //               Pressure — Average
+// //             </h2>
+
+// //             <ResponsiveContainer width="100%" height={260}>
+// //               <LineChart data={chartData}>
+// //                 <XAxis
+// //                   dataKey="hour"
+// //                   tickFormatter={(h) => `${h}:00`}
+// //                   interval={0}
+// //                   stroke="#64748b"
+// //                   tick={{
+// //                     fontSize: isSmallScreen ? 9 : 12,
+// //                     fill: '#94a3b8',
+// //                   }}
+// //                   angle={isSmallScreen ? -45 : 0}
+// //                   textAnchor={isSmallScreen ? 'end' : 'middle'}
+// //                   height={isSmallScreen ? 60 : 30}
+// //                 />
+// //                 <YAxis stroke="#64748b" />
+// //                 <Tooltip />
+// //                 <Line
+// //                   type="monotone"
+// //                   dataKey="simulated"
+// //                   stroke="#22c55e"
+// //                 />
+// //                 <Line
+// //                   type="monotone"
+// //                   dataKey="measured"
+// //                   stroke="#38bdf8"
+// //                   strokeDasharray="5 5"
+// //                 />
+// //               </LineChart>
+// //             </ResponsiveContainer>
+// //           </div>
+
+// //           {/* SYSTEM HEALTH DONUT */}
+// //           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+// //             <h2 className="text-lg mb-4 text-slate-400">
+// //               System Health
+// //             </h2>
+
+// //             <ResponsiveContainer width="100%" height={260}>
+// //               <PieChart>
+// //                 <Pie
+// //                   data={healthData}
+// //                   dataKey="value"
+// //                   innerRadius={50}
+// //                   outerRadius={80}
+// //                 >
+// //                   {healthData.map((entry, i) => (
+// //                     <Cell key={i} fill={entry.color} />
+// //                   ))}
+// //                 </Pie>
+// //               </PieChart>
+// //             </ResponsiveContainer>
+// //           </div>
+// //         </div>
+// //       )}
+
+// //       {/* ================= NODE STATUS TABLE ================= */}
+// //       {activeNetwork && (
+// //         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+// //           <h2 className="text-xl mb-4 text-slate-400">
+// //             Node Status
+// //           </h2>
+
+// //           <div className="max-h-72 overflow-y-auto">
+// //             <table className="w-full text-sm">
+// //               <thead>
+// //                 <tr className="border-b border-slate-800 text-slate-500 text-left">
+// //                   <th className="py-2">Node</th>
+// //                   <th>Type</th>
+// //                   <th>Pressure</th>
+// //                   <th>Status</th>
+// //                 </tr>
+// //               </thead>
+
+// //               <tbody>
+// //                 {activeNetwork.nodes.map((n) => {
+// //                   const p = getPressure(n.id);
+
+// //                   let status = 'Healthy';
+// //                   let color = 'text-emerald-400';
+
+// //                   if (p < 20) {
+// //                     status = 'Critical';
+// //                     color = 'text-red-400';
+// //                   } else if (p < 30) {
+// //                     status = 'Warning';
+// //                     color = 'text-yellow-400';
+// //                   }
+
+// //                   return (
+// //                     <tr
+// //                       key={n.id}
+// //                       className="border-b border-slate-800 hover:bg-slate-800"
+// //                     >
+// //                       <td className="py-2">{n.id}</td>
+// //                       <td>{n.type}</td>
+// //                       <td>{p.toFixed(1)} m</td>
+// //                       <td className={color}>{status}</td>
+// //                     </tr>
+// //                   );
+// //                 })}
+// //               </tbody>
+// //             </table>
+// //           </div>
+// //         </div>
+// //       )}
+// //     </div>
+// //   );
+// // }
+
+// import {
+//   AlertTriangle,
+//   Network,
+//   Gauge,
+//   Layers,
+// } from 'lucide-react';
+// import { useNetworkStore } from '../../store/networkStore';
+// import StatCard from '../../components/StatCard';
+// import { useMemo, useState, useEffect } from 'react';
+// import {
+//   LineChart,
+//   Line,
+//   XAxis,
+//   YAxis,
+//   Tooltip,
+//   ResponsiveContainer,
+// } from 'recharts';
+
+// export default function Dashboard() {
+//   const {
+//     networks,
+//     activeNetworkId,
+//     setActiveNetwork,
+//   } = useNetworkStore();
+
+//   const activeNetwork = networks.find(
+//     (n) => n.id === activeNetworkId
+//   );
+
+//   /* ================= SELECTED NODE ================= */
+//   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+
+//   useEffect(() => {
+//     if (activeNetwork?.nodes.length) {
+//       setSelectedNode(activeNetwork.nodes[0].id);
+//     }
+//   }, [activeNetwork]);
+
+//   /* ================= RESPONSIVE ================= */
+//   const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+//   useEffect(() => {
+//     const handleResize = () => {
+//       setIsSmallScreen(window.innerWidth < 768);
+//     };
+
+//     handleResize();
+//     window.addEventListener('resize', handleResize);
+//     return () => window.removeEventListener('resize', handleResize);
+//   }, []);
+
+//   /* ================= SAFE PRESSURE ACCESS ================= */
+//   const getPressure = (nodeId: string, hour = '0') =>
+//     activeNetwork?.pressures?.[hour]?.[nodeId] ?? 0;
+
+//   /* ================= STATS ================= */
+//   const stats = useMemo(() => {
+//     return {
+//       totalNetworks: networks.length,
+//       totalNodes: networks.reduce((s, n) => s + n.nodes.length, 0),
+//       totalEdges: networks.reduce((s, n) => s + n.edges.length, 0),
+//       totalAlerts: networks.reduce(
+//         (s, n) => s + (n.alerts?.length ?? 0),
+//         0
+//       ),
+//     };
+//   }, [networks]);
+
+//   /* ================= CHART DATA (24 HOURS FIXED) ================= */
+//   const chartData = useMemo(() => {
+//     if (!activeNetwork || !selectedNode) return [];
+
+//     return Array.from({ length: 24 }, (_, h) => {
+//       const p =
+//         activeNetwork?.pressures?.[String(h)]?.[selectedNode] ?? 0;
+
+//       return {
+//         hour: h,
+//         pressure: p,
+//       };
+//     });
+//   }, [activeNetwork, selectedNode]);
+
+//   const avgPressure =
+//     chartData.reduce((s, d) => s + d.pressure, 0) /
+//       (chartData.length || 1) || 0;
+
+//   return (
+//     <div className="p-6 space-y-8 bg-slate-950 min-h-screen text-slate-300">
+
+//       {/* ================= HEADER ================= */}
+//       <div className="flex justify-between items-center">
+//         <div>
+//           <h1 className="text-3xl font-bold text-slate-200">
+//             Dashboard
+//           </h1>
+//           <p className="text-slate-500">
+//             Real-time water network monitoring
+//           </p>
+//         </div>
+
+//         <div className="text-sm text-slate-400">
+//           Last sync: {new Date().toLocaleTimeString()}
+//         </div>
+//       </div>
+
+//       {/* ================= SELECTORS ================= */}
+//       <div className="bg-slate-900 p-4 rounded-xl flex gap-4 flex-wrap">
+
+//         {/* Network Selector */}
+//         <select
+//           value={activeNetworkId ?? ''}
+//           onChange={(e) => setActiveNetwork(e.target.value)}
+//           className="bg-slate-800 text-slate-300 p-2 rounded"
+//         >
+//           <option value="">Select Network</option>
+//           {networks.map((n) => (
+//             <option key={n.id} value={n.id}>
+//               {n.name}
+//             </option>
+//           ))}
+//         </select>
+
+//         {/* Node Selector */}
+//         {activeNetwork && (
+//           <select
+//             value={selectedNode ?? ''}
+//             onChange={(e) => setSelectedNode(e.target.value)}
+//             className="bg-slate-800 text-slate-300 p-2 rounded"
+//           >
+//             {activeNetwork.nodes.map((node) => (
+//               <option key={node.id} value={node.id}>
+//                 {node.id}
+//               </option>
+//             ))}
+//           </select>
+//         )}
+//       </div>
+
+//       {/* ================= STATS ================= */}
+//       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+//         <StatCard icon={<Layers />} label="Networks" value={stats.totalNetworks} />
+//         <StatCard icon={<Network />} label="Nodes" value={stats.totalNodes} />
+//         <StatCard icon={<Network />} label="Pipes" value={stats.totalEdges} />
+//         <StatCard icon={<Gauge />} label="Avg Pressure" value={`${avgPressure.toFixed(1)} m`} />
+//         <StatCard icon={<AlertTriangle />} label="Alerts" value={stats.totalAlerts} />
+//       </div>
+
+//       {/* ================= GRAPH ================= */}
+//       {activeNetwork && selectedNode && (
+//         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+//           <h2 className="text-lg mb-4 text-slate-400">
+//             Pressure — Node {selectedNode}
+//           </h2>
+
+//           <ResponsiveContainer width="100%" height={300}>
+//             <LineChart data={chartData}>
+//               <XAxis
+//                 dataKey="hour"
+//                 tickFormatter={(h) => `${h}:00`}
+//                 interval={0}
+//                 stroke="#64748b"
+//                 tick={{
+//                   fontSize: isSmallScreen ? 9 : 12,
+//                   fill: '#94a3b8',
+//                 }}
+//                 angle={isSmallScreen ? -45 : 0}
+//                 textAnchor={isSmallScreen ? 'end' : 'middle'}
+//                 height={isSmallScreen ? 60 : 30}
+//               />
+//               <YAxis stroke="#64748b" />
+//               <Tooltip />
+//               <Line
+//                 type="monotone"
+//                 dataKey="pressure"
+//                 stroke="#22c55e"
+//               />
+//             </LineChart>
+//           </ResponsiveContainer>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
 import {
   AlertTriangle,
   Network,
@@ -6,102 +443,317 @@ import {
 } from 'lucide-react';
 import { useNetworkStore } from '../../store/networkStore';
 import StatCard from '../../components/StatCard';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 
 export default function Dashboard() {
-  const { networks, setActiveNetwork } =
-    useNetworkStore();
-  const navigate = useNavigate();
+  const {
+    networks,
+    activeNetworkId,
+    setActiveNetwork,
+  } = useNetworkStore();
 
-  const totalNetworks = networks.length;
-  const totalNodes = networks.reduce(
-    (sum, n) => sum + n.nodes.length,
-    0
-  );
-  const totalEdges = networks.reduce(
-    (sum, n) => sum + n.edges.length,
-    0
-  );
-  const totalAlerts = networks.reduce(
-    (sum, n) => sum + (n.alerts?.length ?? 0),
-    0
+  const activeNetwork = networks.find(
+    (n) => n.id === activeNetworkId
   );
 
-  const totalDemand = networks.reduce(
-    (sum, n) =>
-      sum +
-      n.nodes.reduce(
-        (s, node) => s + (node.demand ?? 0),
+  /* ================= SELECTED NODE ================= */
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeNetwork?.nodes.length) {
+      setSelectedNode(activeNetwork.nodes[0].id);
+    }
+  }, [activeNetwork]);
+
+  /* ================= RESPONSIVE ================= */
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSmallScreen(window.innerWidth < 768);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  /* ================= SAFE PRESSURE ================= */
+  const getPressure = (nodeId: string, hour = '0') =>
+    activeNetwork?.pressures?.[hour]?.[nodeId] ?? 0;
+
+  /* ================= STATS ================= */
+  const stats = useMemo(() => {
+    return {
+      totalNetworks: networks.length,
+      totalNodes: networks.reduce((s, n) => s + n.nodes.length, 0),
+      totalEdges: networks.reduce((s, n) => s + n.edges.length, 0),
+      totalAlerts: networks.reduce(
+        (s, n) => s + (n.alerts?.length ?? 0),
         0
       ),
-    0
-  );
+    };
+  }, [networks]);
+
+  /* ================= CHART DATA ================= */
+  const chartData = useMemo(() => {
+    if (!activeNetwork || !selectedNode) return [];
+
+    return Array.from({ length: 24 }, (_, h) => {
+      const p =
+        activeNetwork?.pressures?.[String(h)]?.[selectedNode] ?? 0;
+
+      return {
+        hour: h,
+        pressure: p,
+      };
+    });
+  }, [activeNetwork, selectedNode]);
+
+  const avgPressure =
+    chartData.reduce((s, d) => s + d.pressure, 0) /
+      (chartData.length || 1) || 0;
+
+  /* ================= SYSTEM HEALTH ================= */
+  const healthData = useMemo(() => {
+    if (!activeNetwork) return [];
+
+    let healthy = 0,
+      warning = 0,
+      critical = 0;
+
+    activeNetwork.nodes.forEach((n) => {
+      const p = getPressure(n.id);
+
+      if (p < 20) critical++;
+      else if (p < 30) warning++;
+      else healthy++;
+    });
+
+    const total = healthy + warning + critical || 1;
+
+    return [
+      {
+        name: 'Healthy',
+        value: healthy,
+        percent: ((healthy / total) * 100).toFixed(1),
+        color: '#22c55e',
+      },
+      {
+        name: 'Warning',
+        value: warning,
+        percent: ((warning / total) * 100).toFixed(1),
+        color: '#facc15',
+      },
+      {
+        name: 'Critical',
+        value: critical,
+        percent: ((critical / total) * 100).toFixed(1),
+        color: '#ef4444',
+      },
+    ];
+  }, [activeNetwork]);
 
   return (
     <div className="p-6 space-y-8 bg-slate-950 min-h-screen text-slate-300">
-      <h1 className="text-3xl font-bold text-slate-400">
-        System Dashboard
-      </h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatCard icon={<Layers />} label="Networks" value={totalNetworks} />
-        <StatCard icon={<Network />} label="Nodes" value={totalNodes} />
-        <StatCard icon={<Network />} label="Pipes" value={totalEdges} />
-        <StatCard icon={<Gauge />} label="Total Demand" value={Math.round(totalDemand)} />
-        <StatCard icon={<AlertTriangle />} label="Alerts" value={totalAlerts} />
+      {/* ================= HEADER ================= */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-200">
+            Dashboard
+          </h1>
+          <p className="text-slate-500">
+            Real-time water network monitoring
+          </p>
+        </div>
+
+        <div className="text-sm text-slate-400">
+          Last sync: {new Date().toLocaleTimeString()}
+        </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <h2 className="text-xl font-semibold mb-4 text-slate-400">
-          Network Health
-        </h2>
+      {/* ================= SELECTORS ================= */}
+      <div className="bg-slate-900 p-4 rounded-xl flex gap-4 flex-wrap">
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-800 text-slate-500 text-left">
-              <th className="py-2">Network</th>
-              <th>Nodes</th>
-              <th>Pipes</th>
-              <th>Demand</th>
-              <th>Alerts</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {networks.map((n) => (
-              <tr
-                key={n.id}
-                className="border-b border-slate-800 hover:bg-slate-800"
-              >
-                <td className="py-2 font-medium text-slate-300">
-                  {n.name}
-                </td>
-                <td>{n.nodes.length}</td>
-                <td>{n.edges.length}</td>
-                <td>
-                  {Math.round(
-                    n.nodes.reduce((s, node) => s + (node.demand ?? 0), 0)
-                  )}
-                </td>
-                <td className={n.alerts?.length ? 'text-red-400' : 'text-emerald-400'}>
-                  {n.alerts?.length ?? 0}
-                </td>
-                <td>
-                  <button
-                    onClick={() => {
-                      setActiveNetwork(n.id);
-                      navigate('/user/visualizer');
-                    }}
-                    className="text-blue-400 hover:underline"
-                  >
-                    Open
-                  </button>
-                </td>
-              </tr>
+        {/* Network Selector */}
+        <select
+          value={activeNetworkId ?? ''}
+          onChange={(e) => setActiveNetwork(e.target.value)}
+          className="bg-slate-800 text-slate-300 p-2 rounded"
+        >
+          <option value="">Select Network</option>
+          {networks.map((n) => (
+            <option key={n.id} value={n.id}>
+              {n.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Node Selector */}
+        {activeNetwork && (
+          <select
+            value={selectedNode ?? ''}
+            onChange={(e) => setSelectedNode(e.target.value)}
+            className="bg-slate-800 text-slate-300 p-2 rounded"
+          >
+            {activeNetwork.nodes.map((node) => (
+              <option key={node.id} value={node.id}>
+                {node.id}
+              </option>
             ))}
-          </tbody>
-        </table>
+          </select>
+        )}
       </div>
+
+      {/* ================= STATS ================= */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <StatCard icon={<Layers />} label="Networks" value={stats.totalNetworks} />
+        <StatCard icon={<Network />} label="Nodes" value={stats.totalNodes} />
+        <StatCard icon={<Network />} label="Pipes" value={stats.totalEdges} />
+        <StatCard icon={<Gauge />} label="Avg Pressure" value={`${avgPressure.toFixed(1)} m`} />
+        <StatCard icon={<AlertTriangle />} label="Alerts" value={stats.totalAlerts} />
+      </div>
+
+      {/* ================= GRAPH + DONUT ================= */}
+      {activeNetwork && selectedNode && (
+        <div className="grid md:grid-cols-3 gap-6">
+
+          {/* GRAPH */}
+          <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h2 className="text-lg mb-4 text-slate-400">
+              Pressure — Node {selectedNode}
+            </h2>
+
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <XAxis
+                  dataKey="hour"
+                  tickFormatter={(h) => `${h}:00`}
+                  interval={0}
+                  stroke="#64748b"
+                  tick={{
+                    fontSize: isSmallScreen ? 9 : 12,
+                    fill: '#94a3b8',
+                  }}
+                  angle={isSmallScreen ? -45 : 0}
+                  textAnchor={isSmallScreen ? 'end' : 'middle'}
+                  height={isSmallScreen ? 60 : 30}
+                />
+                <YAxis stroke="#64748b" />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="pressure"
+                  stroke="#22c55e"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* DONUT */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h2 className="text-lg mb-4 text-slate-400">
+              System Health
+            </h2>
+
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={healthData}
+                  dataKey="value"
+                  innerRadius={50}
+                  outerRadius={80}
+                >
+                  {healthData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Legend */}
+            <div className="mt-4 space-y-2 text-sm">
+              {healthData.map((item, i) => (
+                <div key={i} className="flex justify-between">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="w-3 h-3 rounded-full"
+                      style={{ background: item.color }}
+                    />
+                    {item.name}
+                  </span>
+                  <span>
+                    {item.value} ({item.percent}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= NODE TABLE ================= */}
+      {activeNetwork && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <h2 className="text-xl mb-4 text-slate-400">
+            Node Status
+          </h2>
+
+          <div className="max-h-80 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-500 text-left">
+                  <th className="py-2">Node</th>
+                  <th>Type</th>
+                  <th>Pressure</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {activeNetwork.nodes.map((n) => {
+                  const p = getPressure(n.id);
+
+                  let status = 'Healthy';
+                  let color = 'text-emerald-400';
+
+                  if (p < 20) {
+                    status = 'Critical';
+                    color = 'text-red-400';
+                  } else if (p < 30) {
+                    status = 'Warning';
+                    color = 'text-yellow-400';
+                  }
+
+                  return (
+                    <tr
+                      key={n.id}
+                      className="border-b border-slate-800 hover:bg-slate-800 transition"
+                    >
+                      <td className="py-2 font-medium">{n.id}</td>
+                      <td>{n.type}</td>
+                      <td>{p.toFixed(1)} m</td>
+                      <td className={color}>{status}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
