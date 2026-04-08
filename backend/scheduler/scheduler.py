@@ -16,5 +16,5 @@ def update_all_networks():
 
 
 def start_scheduler():
-    scheduler.add_job(update_all_networks, "interval", minutes=5)
+    scheduler.add_job(update_all_networks, "interval", seconds=5)
     scheduler.start()

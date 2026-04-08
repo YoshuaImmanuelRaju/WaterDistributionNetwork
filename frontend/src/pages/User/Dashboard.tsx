@@ -393,12 +393,6 @@
 //   );
 // }
 
-import {
-  AlertTriangle,
-  Network,
-  Gauge,
-  Layers,
-} from 'lucide-react';
 
 import { useNetworkStore } from '../../store/networkStore';
 import { useMemo, useState, useEffect } from 'react';
@@ -419,27 +413,20 @@ import {
 import { generateAlerts } from '../../services/analyticsService';
 import { generateAnomalies } from '../../services/anomalyService';
 import { generateInsights } from '../../services/insightService';
+import { fetchNetwork } from '../../services/networkService'; 
 
 /* ================= COMPONENTS ================= */
-import AlertPriorityPanel from '../../components/AlertPriorityPanel';
+// 👇 FIXED: Ensure the import name matches the component
+import RecommendationsPanel from '../../components/RecommendationsPanel';
 import AnomalyPanel from '../../components/AnomalyPanel';
 
 export default function Dashboard() {
-  const { networks, activeNetworkId, setActiveNetwork } =
+  const { networks, activeNetworkId, setActiveNetwork, updateNetworkState } =
     useNetworkStore();
 
   const activeNetwork = networks.find(
     (n) => n.id === activeNetworkId
   );
-
-  /* ================= NODE ================= */
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (activeNetwork?.nodes.length) {
-      setSelectedNode(activeNetwork.nodes[0].id);
-    }
-  }, [activeNetwork]);
 
   /* ================= TIME ================= */
   const [time, setTime] = useState(new Date());
@@ -451,6 +438,24 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  /* ================= POLLING FOR REAL-TIME DATA ================= */
+  useEffect(() => {
+    if (!activeNetworkId) return;
+
+    const pollData = async () => {
+      try {
+        const updatedNetwork = await fetchNetwork(activeNetworkId);
+        updateNetworkState(updatedNetwork);
+      } catch (error) {
+        console.error("Failed to fetch updated network data:", error);
+      }
+    };
+
+    const interval = setInterval(pollData, 5000); 
+
+    return () => clearInterval(interval);
+  }, [activeNetworkId, updateNetworkState]);
+
   /* ================= HELPERS ================= */
   const getPressure = (nodeId: string, hour = '0') =>
     activeNetwork?.pressures?.[hour]?.[nodeId] ?? 0;
@@ -460,28 +465,27 @@ export default function Dashboard() {
 
   /* ================= GRAPH DATA ================= */
   const chartData = useMemo(() => {
-    if (!activeNetwork || !selectedNode) return [];
+    if (!activeNetwork) return [];
+    const targetHour = '0'; 
 
-    return Array.from({ length: 24 }, (_, h) => ({
-      hour: h,
-      simulated: getPressure(selectedNode, String(h)),
-      measured: getMeasured(selectedNode, String(h)),
+    return activeNetwork.nodes.map((node) => ({
+      nodeId: node.id,
+      simulated: getPressure(node.id, targetHour),
+      measured: getMeasured(node.id, targetHour),
     }));
-  }, [activeNetwork, selectedNode]);
+  }, [activeNetwork]);
 
   /* ================= AVG PRESSURE ================= */
   const avgPressure = useMemo(() => {
     if (!activeNetwork) return 0;
-
     let total = 0;
     activeNetwork.nodes.forEach((n) => {
       total += getPressure(n.id);
     });
-
     return total / (activeNetwork.nodes.length || 1);
   }, [activeNetwork]);
 
-  /* ================= ALERTS ================= */
+  /* ================= ALERTS & ANOMALIES ================= */
   const alerts = useMemo(() => {
     return generateAlerts(
       activeNetwork,
@@ -491,14 +495,12 @@ export default function Dashboard() {
     );
   }, [activeNetwork, avgPressure]);
 
-  /* ================= ANOMALIES ================= */
   const anomalies = useMemo(() => {
     return activeNetwork
       ? generateAnomalies(activeNetwork)
       : [];
   }, [activeNetwork]);
 
-  /* ================= INSIGHTS ================= */
   const insights = useMemo(() => {
     return generateInsights(alerts, anomalies);
   }, [alerts, anomalies]);
@@ -509,38 +511,34 @@ export default function Dashboard() {
       return {
         healthy: 0,
         warning: 0,
-        critical: 0,
+        leaky: 0,
         total: 0,
         healthyPct: '0',
         warningPct: '0',
-        criticalPct: '0',
+        leakyPct: '0',
       };
     }
 
-    let healthy = 0,
-      warning = 0,
-      critical = 0;
-
-    activeNetwork.nodes.forEach((n) => {
-      const p = getPressure(n.id);
-
-      if (p < 20) critical++;
-      else if (p < 30) warning++;
-      else healthy++;
-    });
-
-    const total = healthy + warning + critical || 1;
+    const total = activeNetwork.nodes.length || 1;
+    const totalAnomalies = anomalies.length;
+    
+    // Calculate based on new rules
+    const leaky = anomalies.filter(a => a.type === 'LEAK').length;
+    const warning = totalAnomalies - leaky; 
+    
+    // Ensure healthy doesn't drop below 0 if there are multiple anomalies on one node
+    const healthy = Math.max(0, total - totalAnomalies);
 
     return {
       healthy,
       warning,
-      critical,
+      leaky,
       total,
       healthyPct: ((healthy / total) * 100).toFixed(1),
       warningPct: ((warning / total) * 100).toFixed(1),
-      criticalPct: ((critical / total) * 100).toFixed(1),
+      leakyPct: ((leaky / total) * 100).toFixed(1),
     };
-  }, [activeNetwork]);
+  }, [activeNetwork, anomalies]);
 
   /* ================= NO NETWORK ================= */
   if (!activeNetwork) {
@@ -556,10 +554,7 @@ export default function Dashboard() {
 
       {/* HEADER */}
       <div className="flex justify-between items-center">
-
-        {/* SELECTORS */}
         <div className="bg-slate-900 p-4 rounded-xl flex gap-4 flex-wrap border border-slate-800">
-
           <select
             value={activeNetworkId ?? ''}
             onChange={(e) => setActiveNetwork(e.target.value)}
@@ -572,28 +567,12 @@ export default function Dashboard() {
               </option>
             ))}
           </select>
-
-          <select
-            value={selectedNode ?? ''}
-            onChange={(e) => setSelectedNode(e.target.value)}
-            className="bg-slate-800 text-slate-300 p-2 rounded"
-          >
-            {activeNetwork.nodes.map((node) => (
-              <option key={node.id} value={node.id}>
-                {node.id}
-              </option>
-            ))}
-          </select>
-
         </div>
 
         <div>
           <h1 className="text-3xl font-bold text-slate-200">
             Dashboard
           </h1>
-          <p className="text-slate-500">
-            Digital Twin Water Monitoring
-          </p>
         </div>
 
         <div className="text-sm text-slate-400">
@@ -601,28 +580,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* PRESSURE */}
-      {selectedNode && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-lg mb-4 text-slate-400">
-            Pressure — Node {selectedNode}
-          </h2>
+      {/* PRESSURE CHART */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <h2 className="text-lg mb-4 text-slate-400">
+          Network Pressure Overview (Current Interval)
+        </h2>
 
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <XAxis dataKey="hour" />
-              <YAxis />
-              <Tooltip />
-              <Line dataKey="simulated" stroke="#22c55e" />
-              <Line dataKey="measured" stroke="#38bdf8" strokeDasharray="5 5" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={chartData}>
+            <XAxis dataKey="nodeId" /> 
+            <YAxis />
+            <Tooltip />
+            <Line dataKey="simulated" stroke="#22c55e" dot={false} />
+            <Line dataKey="measured" stroke="#38bdf8" strokeDasharray="5 5" dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-      {/* SYSTEM OVERVIEW */}
+      {/* SYSTEM OVERVIEW STAT CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-
+        
         <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
           <div className="text-sm text-slate-500">Networks</div>
           <div className="text-2xl font-bold">{networks.length}</div>
@@ -630,19 +607,17 @@ export default function Dashboard() {
 
         <div className="bg-red-900/20 p-4 rounded-xl border border-red-800">
           <div className="text-sm text-red-400">Active Alerts</div>
-          <div className="text-2xl font-bold text-red-300">{alerts.length}</div>
+          <div className="text-2xl font-bold text-red-300">{anomalies.length}</div>
         </div>
 
-        <div className="bg-yellow-900/20 p-4 rounded-xl border border-yellow-800">
-          <div className="text-sm text-yellow-400">Critical Nodes</div>
-          <div className="text-2xl font-bold text-yellow-300">{healthData.critical}</div>
+        <div className="bg-emerald-900/20 p-4 rounded-xl border border-emerald-800">
+          <div className="text-sm text-emerald-400">Network Health</div>
+          <div className="text-2xl font-bold text-emerald-300">{healthData.healthyPct}%</div>
         </div>
 
         <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-800">
           <div className="text-sm text-blue-400">Leak Suspects</div>
-          <div className="text-2xl font-bold text-blue-300">
-            {anomalies.filter(a => a.type === 'LEAK').length}
-          </div>
+          <div className="text-2xl font-bold text-blue-300">{healthData.leaky}</div>
         </div>
 
         <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
@@ -654,40 +629,35 @@ export default function Dashboard() {
 
       </div>
 
-      {/* PRIORITY ALERTS + HEALTH */}
+      {/* PRIORITY ALERTS + HEALTH PIE CHART */}
       <div className="grid md:grid-cols-2 gap-6">
+        
+        {/* 👇 FIXED: Passing anomalies instead of insights */}
+        <RecommendationsPanel networkId={activeNetworkId} anomalies={anomalies} />
 
-        <AlertPriorityPanel insights={insights} />
-
-        {/* SYSTEM HEALTH (unchanged) */}
+        {/* SYSTEM HEALTH */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <h2 className="text-lg mb-4 text-slate-400">
             System Health Overview
           </h2>
-
           <div className="grid grid-cols-2 gap-4">
-
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-green-400">Healthy</span>
                 <span>{healthData.healthy} ({healthData.healthyPct}%)</span>
               </div>
-
               <div className="flex justify-between">
                 <span className="text-yellow-400">Warning</span>
                 <span>{healthData.warning} ({healthData.warningPct}%)</span>
               </div>
-
               <div className="flex justify-between">
-                <span className="text-red-400">Critical</span>
-                <span>{healthData.critical} ({healthData.criticalPct}%)</span>
+                <span className="text-red-400">Leaky</span>
+                <span>{healthData.leaky} ({healthData.leakyPct}%)</span>
               </div>
-
               <div className="text-sm text-slate-500">
                 Total Nodes: {healthData.total}
               </div>
             </div>
-
             <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -695,7 +665,7 @@ export default function Dashboard() {
                     data={[
                       { name: 'Healthy', value: healthData.healthy },
                       { name: 'Warning', value: healthData.warning },
-                      { name: 'Critical', value: healthData.critical },
+                      { name: 'Leaky', value: healthData.leaky },
                     ]}
                     dataKey="value"
                   >
@@ -706,10 +676,8 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-
           </div>
         </div>
-
       </div>
 
       {/* ANOMALIES */}

@@ -22,7 +22,7 @@ export default function Navbar() {
               <Waypoints className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-blue-400 tracking-wide">Water Network System</h1>
+              <h1 className="text-xl font-bold text-blue-400 tracking-wide">Water Monitoring System</h1>
               <p className="text-xs text-gray-400"> User Portal </p>
             </div>
           </div>

@@ -18,6 +18,9 @@ type NetworkStore = {
   deleteNetwork: (networkId: string) => void;
 
   getActiveNetwork: () => Network | null;
+  
+  // 👇 NEW: Added to type definition
+  updateNetworkState: (updatedNetwork: Network) => void;
 };
 
 export const useNetworkStore = create<NetworkStore>()(
@@ -78,6 +81,15 @@ export const useNetworkStore = create<NetworkStore>()(
           null
         );
       },
+
+      /* ================= UPDATE NETWORK STATE ================= */
+      // 👇 NEW: Implementation to replace the network with fresh data
+      updateNetworkState: (updatedNetwork) =>
+        set((state) => ({
+          networks: state.networks.map((net) =>
+            net.id === updatedNetwork.id ? updatedNetwork : net
+          ),
+        })),
     }),
     {
       name: 'wdn-networks-store',

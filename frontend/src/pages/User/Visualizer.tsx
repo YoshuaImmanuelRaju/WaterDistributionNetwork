@@ -31,10 +31,10 @@ function Visualizer() {
 
     const formData = new FormData();
     formData.append('file', file);
-
+    // https://water-network-backend.onrender.com/networks/upload
     try {
       const res = await fetch(
-        'https://water-network-backend.onrender.com/networks/upload',
+        'http://localhost:8000/networks/upload',
         {
           method: 'POST',
           body: formData,
