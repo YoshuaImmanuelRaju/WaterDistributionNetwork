@@ -1,22 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-export type NodeType = {
-  id: string;
-  type: string;
-  demand?: number;
-  x: number;
-  y: number;
-};
-
-export type Network = {
-  id: string;
-  name: string;
-  nodes: NodeType[];
-  edges: any[];
-  alerts?: any[];
-  pressures?: Record<string, Record<string, number>>;
-};
+import { Network } from '../types/network';
 
 type NetworkStore = {
   networks: Network[];
@@ -24,15 +8,19 @@ type NetworkStore = {
 
   addNetwork: (n: Network) => void;
   setActiveNetwork: (id: string) => void;
+
   updateNodeDemand: (
     networkId: string,
     nodeId: string,
     demand: number
   ) => void;
 
-  deleteNetwork: (networkId: string) => void;   // 🔥 NEW
+  deleteNetwork: (networkId: string) => void;
 
   getActiveNetwork: () => Network | null;
+  
+  // 👇 NEW: Added to type definition
+  updateNetworkState: (updatedNetwork: Network) => void;
 };
 
 export const useNetworkStore = create<NetworkStore>()(
@@ -41,15 +29,18 @@ export const useNetworkStore = create<NetworkStore>()(
       networks: [],
       activeNetworkId: null,
 
+      /* ================= ADD ================= */
       addNetwork: (network) =>
         set((state) => ({
           networks: [...state.networks, network],
           activeNetworkId: network.id,
         })),
 
+      /* ================= SET ACTIVE ================= */
       setActiveNetwork: (id) =>
         set({ activeNetworkId: id }),
 
+      /* ================= UPDATE NODE ================= */
       updateNodeDemand: (networkId, nodeId, demand) =>
         set((state) => ({
           networks: state.networks.map((net) =>
@@ -66,7 +57,7 @@ export const useNetworkStore = create<NetworkStore>()(
           ),
         })),
 
-      // 🔥 DELETE NETWORK
+      /* ================= DELETE ================= */
       deleteNetwork: (networkId) =>
         set((state) => {
           const filtered = state.networks.filter(
@@ -82,6 +73,7 @@ export const useNetworkStore = create<NetworkStore>()(
           };
         }),
 
+      /* ================= GET ACTIVE ================= */
       getActiveNetwork: () => {
         const { networks, activeNetworkId } = get();
         return (
@@ -89,7 +81,18 @@ export const useNetworkStore = create<NetworkStore>()(
           null
         );
       },
+
+      /* ================= UPDATE NETWORK STATE ================= */
+      // 👇 NEW: Implementation to replace the network with fresh data
+      updateNetworkState: (updatedNetwork) =>
+        set((state) => ({
+          networks: state.networks.map((net) =>
+            net.id === updatedNetwork.id ? updatedNetwork : net
+          ),
+        })),
     }),
-    { name: 'wdn-networks-store' }
+    {
+      name: 'wdn-networks-store',
+    }
   )
 );

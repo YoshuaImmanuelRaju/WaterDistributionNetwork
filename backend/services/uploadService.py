@@ -2,117 +2,140 @@ import uuid
 import tempfile
 import os
 import wntr
-from fastapi import UploadFile
+import asyncio
+from fastapi import UploadFile, HTTPException
+
+# NEW IMPORTS
+from store.networkStore import networks
+from services.measurementService import generate_measured_data
 
 
 async def process_epanet_upload(file: UploadFile):
+    # ================= VALIDATION =================
     if not file.filename.endswith(".inp"):
-        return {"error": "Only .inp supported"}
+        raise HTTPException(
+            status_code=400,
+            detail="Only .inp files are supported"
+        )
 
-    content = (await file.read()).decode("utf-8")
-
+    # ================= SAVE FILE SAFELY =================
     with tempfile.NamedTemporaryFile(delete=False, suffix=".inp") as f:
-        f.write(content.encode("utf-8"))
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
         inp_path = f.name
 
-    # ---- LOAD NETWORK ----
-    wn = wntr.network.WaterNetworkModel(inp_path)
+    try:
+        # ================= LOAD NETWORK =================
+        try:
+            wn = wntr.network.WaterNetworkModel(inp_path)
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid EPANET file"
+            )
 
-    # ---- FORCE HOURLY HYDRAULICS ----
-    wn.options.time.hydraulic_timestep = 3600
-    wn.options.time.report_timestep = 3600
-    wn.options.time.pattern_timestep = 3600
-    wn.options.time.duration = 24 * 3600
+        # ================= TIME SETTINGS =================
+        wn.options.time.hydraulic_timestep = 3600
+        wn.options.time.report_timestep = 3600
+        wn.options.time.pattern_timestep = 3600
+        wn.options.time.duration = 24 * 3600
 
-    # ---- RUN SIMULATION ----
-    sim = wntr.sim.EpanetSimulator(wn)
-    results = sim.run_sim()
+        # ================= RUN SIMULATION (ASYNC SAFE) =================
+        sim = wntr.sim.EpanetSimulator(wn)
+        results = await asyncio.to_thread(sim.run_sim)
 
-    pressure_df = results.node["pressure"]
+        pressure_df = results.node["pressure"]
 
-    pressures = {
-        int(t // 3600): pressure_df.loc[t].to_dict()
-        for t in pressure_df.index
-    }
-
-    # =========================
-    # NODES WITH FULL PROPERTIES
-    # =========================
-    nodes = []
-
-    for name, node in wn.nodes():
-        coord = node.coordinates or (0, 0)
-
-        node_data = {
-            "id": name,
-            "type": node.node_type.lower(),
-            "x": coord[0] * 10,
-            "y": coord[1] * 10,
+        # ================= PRESSURE (24 HOURS) =================
+        pressures = {
+            int(t // 3600): pressure_df.loc[t].to_dict()
+            for t in pressure_df.index
         }
 
-        node_type = node.node_type.lower()
+        # ================= NODES =================
+        nodes = []
+        for name, node in wn.nodes():
+            coord = node.coordinates or (0, 0)
 
-        if node_type == "junction":
-            node_data.update({
-                "elevation": node.elevation,
-                "base_demand": node.base_demand,
-            })
+            node_data = {
+                "id": name,
+                "type": node.node_type.lower(),
+                "x": coord[0],
+                "y": coord[1],
+            }
 
-        elif node_type == "tank":
-            node_data.update({
-                "elevation": node.elevation,
-                "init_level": node.init_level,
-                "min_level": node.min_level,
-                "max_level": node.max_level,
-                "diameter": node.diameter,
-            })
+            node_type = node.node_type.lower()
 
-        elif node_type == "reservoir":
-            node_data.update({
-                "head": node.head,
-            })
+            if node_type == "junction":
+                node_data.update({
+                    "elevation": node.elevation,
+                    "base_demand": node.base_demand,
+                })
 
-        nodes.append(node_data)
+            elif node_type == "tank":
+                node_data.update({
+                    "elevation": node.elevation,
+                    "init_level": node.init_level,
+                    "min_level": node.min_level,
+                    "max_level": node.max_level,
+                    "diameter": node.diameter,
+                })
 
-    # =========================
-    # EDGES WITH FULL PROPERTIES
-    # =========================
-    edges = []
+            elif node_type == "reservoir":
+                node_data.update({
+                    "head": node.head,
+                })
 
-    for name, link in wn.links():
+            nodes.append(node_data)
 
-        link_type = link.link_type.lower()
+        # ================= EDGES =================
+        edges = []
+        for name, link in wn.links():
+            link_type = link.link_type.lower()
 
-        link_data = {
-            "id": name,
-            "source": link.start_node_name,
-            "target": link.end_node_name,
-            "type": link_type,
+            link_data = {
+                "id": name,
+                "source": link.start_node_name,
+                "target": link.end_node_name,
+                "type": link_type,
+            }
+
+            if link_type == "pipe":
+                link_data.update({
+                    "length": link.length,
+                    "diameter": link.diameter,
+                    "roughness": link.roughness,
+                    "loss_coeff": link.minor_loss,
+                    "status": str(link.initial_status),
+                })
+
+            elif link_type == "pump":
+                link_data.update({
+                    "pump_curve": link.pump_curve_name,
+                    "status": str(link.initial_status),
+                })
+
+            edges.append(link_data)
+
+        # ================= BUILD NETWORK OBJECT =================
+        network_data = {
+            "id": str(uuid.uuid4()),
+            "name": file.filename,
+            "nodes": nodes,
+            "edges": edges,
+            "pressures": pressures,
+            "measured_pressures": {},  # will be filled next
         }
 
-        if link_type == "pipe":
-            link_data.update({
-                "length": link.length,
-                "diameter": link.diameter,
-                "roughness": link.roughness,
-                "loss_coeff": link.minor_loss,
-                "status": str(link.initial_status),
-            })
+        # ================= GENERATE MEASURED DATA =================
+        generate_measured_data(network_data)
 
-        elif link_type == "pump":
-            link_data.update({
-                "pump_curve": link.pump_curve_name,
-                "status": str(link.initial_status),
-            })
+        # ================= STORE NETWORK =================
+        networks.append(network_data)
 
-        edges.append(link_data)
+        return network_data
 
-    os.remove(inp_path)
-
-    return {
-        "id": str(uuid.uuid4()),
-        "name": file.filename,
-        "nodes": nodes,
-        "edges": edges,
-        "pressures": pressures,
-    }
+    finally:
+        # ================= CLEANUP =================
+        if os.path.exists(inp_path):
+            os.remove(inp_path)
