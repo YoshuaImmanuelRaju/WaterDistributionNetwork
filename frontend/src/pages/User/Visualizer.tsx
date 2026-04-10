@@ -4,6 +4,8 @@ import EpanetVisualizer from '../../components/epanet/EpanetVisualizer';
 import PressureAnalytics from '../../components/epanet/PressureAnalytics';
 import { toast } from 'react-toastify';
 
+const BASE_URL = "https://water-network-backend-eeae.onrender.com"
+
 function Visualizer() {
   const {
     networks,
@@ -34,7 +36,7 @@ function Visualizer() {
     // https://water-network-backend.onrender.com/networks/upload
     try {
       const res = await fetch(
-        'http://localhost:8000/networks/upload',
+        `${BASE_URL}/networks/upload`,
         {
           method: 'POST',
           body: formData,
