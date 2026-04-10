@@ -1,7 +1,7 @@
 import { Network } from '../types/network.ts';
 
-// const API_BASE_URL = 'https://water-network-backend.onrender.com';
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://water-network-backend-eeae.onrender.com';
+// const API_BASE_URL = 'http://localhost:8000';
 
 export async function uploadNetwork(
   file: File
